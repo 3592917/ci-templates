@@ -13,10 +13,6 @@ on:
         required: false
         type: boolean
         default: false
-      run_codecov:
-        required: false
-        type: boolean
-        default: false
       upload_apk:
         required: false
         type: boolean
@@ -46,15 +42,40 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Format check
-        run: flutter format --set-exit-if-changed .
+      - name: Format check (tries flutter format, then dart format)
+        run: |
+          set -euo pipefail
+          if command -v flutter >/dev/null 2>&1; then
+            if flutter help format >/dev/null 2>&1 || flutter format --help >/dev/null 2>&1; then
+              echo "Using 'flutter format'..."
+              if flutter format --set-exit-if-changed . >/dev/null 2>&1; then
+                echo "No formatting changes required (flutter format)."
+              else
+                # Si flutter format retornó código distinto, reejecutamos sin redirigir salida para que se vea el diff
+                flutter format --set-exit-if-changed .
+              fi
+            else
+              echo "'flutter format' no disponible, intentando 'dart format'..."
+              if command -v dart >/dev/null 2>&1; then
+                dart format --set-exit-if-changed .
+              else
+                echo "Ni 'flutter format' ni 'dart format' están disponibles." >&2
+                exit 1
+              fi
+            fi
+          elif command -v dart >/dev/null 2>&1; then
+            echo "Usando 'dart format' porque 'flutter' no está en PATH..."
+            dart format --set-exit-if-changed .
+          else
+            echo "Ni 'flutter' ni 'dart' están disponibles en el runner." >&2
+            exit 1
+          fi
 
       - name: Static analysis
         run: flutter analyze
 
       - name: Run unit tests (with coverage)
         run: flutter test --coverage
-
 
   android-build:
     if: ${{ inputs.run_android_build }}
@@ -100,8 +121,6 @@ jobs:
 
       - name: Attempt iOS build (no codesign)
         run: |
-          # Nota: para archivar y subir a App Store / device necesitas firmar (certs, provisioning)
-          # Este paso intenta una build básica sin firmar.
           flutter build ios --no-codesign || true
 
       - name: Upload iOS build logs
