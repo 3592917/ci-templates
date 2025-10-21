@@ -21,10 +21,6 @@ on:
         required: false
         type: boolean
         default: false
-    secrets:
-      CODECOV_TOKEN:
-        required: false
-
 
 jobs:
   analyze-and-test:
@@ -59,11 +55,6 @@ jobs:
       - name: Run unit tests (with coverage)
         run: flutter test --coverage
 
-      - name: Upload coverage to Codecov
-        if: ${{ inputs.run_codecov && secrets.CODECOV_TOKEN != '' }}
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
 
   android-build:
     if: ${{ inputs.run_android_build }}
